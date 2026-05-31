@@ -138,7 +138,7 @@ Gofleet Development Team
 - Manga Patrice
 - Chenoassi Yvan
 - Tallin Alexandre
-- Mouf Azazel Azazel
+- Tchassem Azazel Edwin
 
 
 ## Project Type
