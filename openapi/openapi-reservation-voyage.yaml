@@ -1,0 +1,1743 @@
+openapi: 3.0.3
+
+info:
+  title: API Réservation de Voyage
+  description: |
+    API REST complète pour l'application mobile de réservation de voyage.
+    
+    ## Flux métier principal
+    1. L'utilisateur s'inscrit / se connecte
+    2. Il recherche un voyage
+    3. Il choisit un siège
+    4. Il remplit ses informations + pièce d'identité
+    5. Il paie
+    6. Il reçoit un ticket avec QR Code
+    
+    ## Authentification
+    L'API utilise JWT (Bearer Token). Après connexion, incluez le token dans chaque requête :
+    `Authorization: Bearer <token>`
+  version: 1.0.0
+  contact:
+    name: Équipe Développement
+    email: dev@reservationvoyage.cm
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Serveur local de développement
+  - url: https://api.reservationvoyage.cm/api/v1
+    description: Serveur de production
+
+tags:
+  - name: Auth
+    description: Inscription, connexion, gestion du compte
+  - name: Utilisateurs
+    description: Profil utilisateur
+  - name: Agences
+    description: Gestion des agences de voyage
+  - name: Moyens de Transport
+    description: Types de moyens de transport
+  - name: Véhicules
+    description: Gestion des véhicules
+  - name: Voyages
+    description: Recherche et gestion des voyages
+  - name: Sièges
+    description: Disponibilité et sélection des sièges
+  - name: Réservations
+    description: Gestion des réservations
+  - name: Paiements
+    description: Traitement des paiements
+  - name: Factures
+    description: Génération et téléchargement des factures
+  - name: Tickets
+    description: Tickets et QR Codes
+  - name: Avis
+    description: Notes et commentaires sur les agences
+
+# ─────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────
+paths:
+
+  # ══════════════════════════════
+  # AUTH
+  # ══════════════════════════════
+
+  /auth/inscription:
+    post:
+      tags: [Auth]
+      summary: Créer un compte utilisateur
+      operationId: inscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscriptionRequest'
+      responses:
+        '201':
+          description: Compte créé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email ou téléphone déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /auth/connexion:
+    post:
+      tags: [Auth]
+      summary: Connexion avec email + mot de passe
+      operationId: connexion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnexionRequest'
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Renouveler le token JWT
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Nouveau token généré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/deconnexion:
+    post:
+      tags: [Auth]
+      summary: Déconnexion (invalider le token)
+      operationId: deconnexion
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+
+  /auth/mot-de-passe/reinitialiser:
+    post:
+      tags: [Auth]
+      summary: Demander la réinitialisation du mot de passe
+      operationId: demandeReinitialisationMotDePasse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Email de réinitialisation envoyé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+
+  /auth/mot-de-passe/confirmer:
+    post:
+      tags: [Auth]
+      summary: Confirmer le nouveau mot de passe avec le code reçu par email
+      operationId: confirmerMotDePasse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, nouveauMotDePasse]
+              properties:
+                token:
+                  type: string
+                nouveauMotDePasse:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Mot de passe modifié avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ══════════════════════════════
+  # UTILISATEURS
+  # ══════════════════════════════
+
+  /utilisateurs/moi:
+    get:
+      tags: [Utilisateurs]
+      summary: Obtenir le profil de l'utilisateur connecté
+      operationId: getMonProfil
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil de l'utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Utilisateurs]
+      summary: Mettre à jour le profil de l'utilisateur connecté
+      operationId: mettreAJourProfil
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiseAJourProfilRequest'
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /utilisateurs/moi/photo:
+    post:
+      tags: [Utilisateurs]
+      summary: Uploader la photo de profil
+      operationId: uploadPhotoProfil
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Photo uploadée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photoUrl:
+                    type: string
+                    format: uri
+
+  /utilisateurs/moi/cni:
+    post:
+      tags: [Utilisateurs]
+      summary: Uploader les photos de la pièce d'identité (CNI recto/verso ou Passeport)
+      operationId: uploadPieceIdentite
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                cniRecto:
+                  type: string
+                  format: binary
+                  description: Photo recto de la CNI
+                cniVerso:
+                  type: string
+                  format: binary
+                  description: Photo verso de la CNI
+                passeport:
+                  type: string
+                  format: binary
+                  description: Photo du passeport (si pas de CNI)
+      responses:
+        '200':
+          description: Pièce uploadée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ══════════════════════════════
+  # AGENCES
+  # ══════════════════════════════
+
+  /agences:
+    get:
+      tags: [Agences]
+      summary: Lister toutes les agences actives
+      operationId: listerAgences
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: taille
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: ville
+          in: query
+          schema:
+            type: string
+          description: Filtrer par ville principale
+      responses:
+        '200':
+          description: Liste des agences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageAgence'
+
+  /agences/{id}:
+    get:
+      tags: [Agences]
+      summary: Obtenir les détails d'une agence
+      operationId: getAgence
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Détails de l'agence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgenceDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /agences/{id}/avis:
+    get:
+      tags: [Agences]
+      summary: Lister les avis d'une agence
+      operationId: getAvisAgence
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: taille
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Liste des avis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageAvis'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # MOYENS DE TRANSPORT
+  # ══════════════════════════════
+
+  /moyens-transport:
+    get:
+      tags: [Moyens de Transport]
+      summary: Lister tous les moyens de transport
+      operationId: listerMoyensTransport
+      responses:
+        '200':
+          description: Liste des moyens de transport
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MoyenTransportResponse'
+
+  # ══════════════════════════════
+  # VOYAGES
+  # ══════════════════════════════
+
+  /voyages:
+    get:
+      tags: [Voyages]
+      summary: Rechercher des voyages
+      operationId: rechercherVoyages
+      parameters:
+        - name: villeDepart
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Douala
+        - name: villeArrivee
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Yaoundé
+        - name: dateDepart
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-10"
+        - name: typeClasse
+          in: query
+          schema:
+            $ref: '#/components/schemas/TypeClasse'
+        - name: prixMin
+          in: query
+          schema:
+            type: number
+        - name: prixMax
+          in: query
+          schema:
+            type: number
+        - name: agenceId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: taille
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: tri
+          in: query
+          schema:
+            type: string
+            enum: [prixAsc, prixDesc, heureAsc, noteDesc]
+            default: heureAsc
+      responses:
+        '200':
+          description: Liste des voyages disponibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageVoyageListeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /voyages/{id}:
+    get:
+      tags: [Voyages]
+      summary: Obtenir les détails complets d'un voyage
+      operationId: getVoyage
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Détails du voyage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoyageDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # SIÈGES
+  # ══════════════════════════════
+
+  /voyages/{id}/sieges:
+    get:
+      tags: [Sièges]
+      summary: Obtenir le plan des sièges d'un voyage
+      operationId: getSiegesVoyage
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Plan des sièges avec leur statut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SiegeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # RÉSERVATIONS
+  # ══════════════════════════════
+
+  /reservations:
+    get:
+      tags: [Réservations]
+      summary: Mes réservations
+      operationId: getMesReservations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: statut
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatutReservation'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: taille
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Liste des réservations de l'utilisateur connecté
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageReservationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Réservations]
+      summary: Créer une nouvelle réservation
+      operationId: creerReservation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreerReservationRequest'
+      responses:
+        '201':
+          description: Réservation créée (statut = EN_ATTENTE, en attente du paiement)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Siège déjà réservé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /reservations/{id}:
+    get:
+      tags: [Réservations]
+      summary: Détails d'une réservation
+      operationId: getReservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Détails de la réservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/{id}/annuler:
+    post:
+      tags: [Réservations]
+      summary: Annuler une réservation
+      operationId: annulerReservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Réservation annulée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/{id}/piece-identite:
+    post:
+      tags: [Réservations]
+      summary: Uploader la pièce d'identité pour une réservation (étape 4)
+      operationId: uploadPieceIdentiteReservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                cniRecto:
+                  type: string
+                  format: binary
+                cniVerso:
+                  type: string
+                  format: binary
+                passeport:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Pièce uploadée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # PAIEMENTS
+  # ══════════════════════════════
+
+  /paiements/initier:
+    post:
+      tags: [Paiements]
+      summary: Initier un paiement pour une réservation
+      operationId: initierPaiement
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitierPaiementRequest'
+      responses:
+        '200':
+          description: Paiement initié. Contient les infos pour la redirection (ex. URL de paiement Mobile Money)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitierPaiementResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /paiements/confirmer:
+    post:
+      tags: [Paiements]
+      summary: Confirmer un paiement (webhook ou retour passerelle)
+      operationId: confirmerPaiement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmerPaiementRequest'
+      responses:
+        '200':
+          description: Paiement confirmé. La réservation est validée, ticket généré.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmerPaiementResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /paiements/{id}/statut:
+    get:
+      tags: [Paiements]
+      summary: Vérifier le statut d'un paiement
+      operationId: getStatutPaiement
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Statut du paiement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaiementResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # FACTURES
+  # ══════════════════════════════
+
+  /factures/{id}:
+    get:
+      tags: [Factures]
+      summary: Obtenir les détails d'une facture
+      operationId: getFacture
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Détails de la facture
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactureResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /factures/{id}/telecharger:
+    get:
+      tags: [Factures]
+      summary: Télécharger la facture en PDF
+      operationId: telechargerFacture
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Fichier PDF de la facture
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/{id}/facture:
+    get:
+      tags: [Factures]
+      summary: Obtenir la facture d'une réservation
+      operationId: getFactureReservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Facture de la réservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactureResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # TICKETS / QR CODE
+  # ══════════════════════════════
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Obtenir les détails d'un ticket
+      operationId: getTicket
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Détails du ticket avec QR Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tickets/{id}/telecharger:
+    get:
+      tags: [Tickets]
+      summary: Télécharger le billet (PDF avec QR Code)
+      operationId: telechargerTicket
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Billet PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tickets/valider:
+    post:
+      tags: [Tickets]
+      summary: Valider un ticket au contrôle d'embarquement (scan QR Code)
+      operationId: validerTicket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codeTicket]
+              properties:
+                codeTicket:
+                  type: string
+                  description: Code extrait du QR Code lors du scan
+      responses:
+        '200':
+          description: Ticket validé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationTicketResponse'
+        '400':
+          description: Ticket invalide, déjà utilisé ou expiré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/{id}/ticket:
+    get:
+      tags: [Tickets]
+      summary: Obtenir le ticket d'une réservation
+      operationId: getTicketReservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Ticket de la réservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════
+  # AVIS
+  # ══════════════════════════════
+
+  /avis:
+    post:
+      tags: [Avis]
+      summary: Laisser un avis sur une agence
+      operationId: laisserAvis
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreerAvisRequest'
+      responses:
+        '201':
+          description: Avis enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvisResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /avis/moi:
+    get:
+      tags: [Avis]
+      summary: Mes avis
+      operationId: getMesAvis
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste de mes avis
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvisResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ─────────────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────────────
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  # ══════════════════════════════
+  # RESPONSES RÉUTILISABLES
+  # ══════════════════════════════
+  responses:
+    BadRequest:
+      description: Données invalides
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Non authentifié
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Accès refusé
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  # ══════════════════════════════
+  # SCHEMAS / MODÈLES
+  # ══════════════════════════════
+  schemas:
+
+    # ─── ENUMS ───────────────────
+
+    TypeClasse:
+      type: string
+      enum: [VIP, CLASSIQUE, BUSINESS, PREMIERE_CLASSE]
+      description: Classe de voyage
+
+    StatutVoyage:
+      type: string
+      enum: [OUVERT, COMPLET, ANNULE, TERMINE]
+
+    StatutSiege:
+      type: string
+      enum: [DISPONIBLE, RESERVE, OCCUPE]
+
+    StatutReservation:
+      type: string
+      enum: [EN_ATTENTE, CONFIRMEE, ANNULEE, TERMINEE]
+
+    StatutPaiement:
+      type: string
+      enum: [EN_ATTENTE, REUSSI, ECHEC]
+
+    MethodePaiement:
+      type: string
+      enum: [ORANGE_MONEY, MTN_MOMO, CARTE_BANCAIRE, PAYPAL]
+
+    StatutTicket:
+      type: string
+      enum: [VALIDE, UTILISE, ANNULE]
+
+    StatutAgence:
+      type: string
+      enum: [EN_ATTENTE, VALIDE, SUSPENDU]
+
+    StatutVerification:
+      type: string
+      enum: [NON_VERIFIE, EN_COURS, VERIFIE]
+
+    # ─── AUTH ────────────────────
+
+    InscriptionRequest:
+      type: object
+      required: [nom, prenom, email, telephone, motDePasse, dateNaissance, sexe]
+      properties:
+        nom:
+          type: string
+          example: Mbarga
+        prenom:
+          type: string
+          example: Jean
+        email:
+          type: string
+          format: email
+          example: jean.mbarga@gmail.com
+        telephone:
+          type: string
+          example: "+237690000000"
+        motDePasse:
+          type: string
+          minLength: 8
+          example: MonMotDePasse123
+        dateNaissance:
+          type: string
+          format: date
+          example: "1995-04-15"
+        sexe:
+          type: string
+          enum: [M, F]
+        numeroCni:
+          type: string
+          example: "123456789"
+
+    ConnexionRequest:
+      type: object
+      required: [email, motDePasse]
+      properties:
+        email:
+          type: string
+          format: email
+        motDePasse:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT à utiliser dans Authorization header
+        refreshToken:
+          type: string
+          description: Token pour renouveler l'access token
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Durée de validité en secondes
+          example: 3600
+        utilisateur:
+          $ref: '#/components/schemas/UtilisateurResponse'
+
+    # ─── UTILISATEUR ─────────────
+
+    UtilisateurResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+          format: email
+        telephone:
+          type: string
+        dateNaissance:
+          type: string
+          format: date
+        sexe:
+          type: string
+          enum: [M, F]
+        photoProfilUrl:
+          type: string
+          format: uri
+          nullable: true
+        numeroCni:
+          type: string
+          nullable: true
+        statutVerification:
+          $ref: '#/components/schemas/StatutVerification'
+        dateCreation:
+          type: string
+          format: date-time
+
+    MiseAJourProfilRequest:
+      type: object
+      properties:
+        nom:
+          type: string
+        prenom:
+          type: string
+        telephone:
+          type: string
+        dateNaissance:
+          type: string
+          format: date
+        sexe:
+          type: string
+          enum: [M, F]
+        numeroCni:
+          type: string
+
+    # ─── AGENCE ──────────────────
+
+    AgenceListeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nom:
+          type: string
+          example: Touristique Express
+        logoUrl:
+          type: string
+          format: uri
+        villePrincipale:
+          type: string
+          example: Douala
+        noteMoyenne:
+          type: number
+          format: float
+          example: 4.3
+        nombreAvis:
+          type: integer
+          example: 128
+
+    AgenceDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/AgenceListeResponse'
+        - type: object
+          properties:
+            description:
+              type: string
+            telephone:
+              type: string
+            email:
+              type: string
+              format: email
+            adresse:
+              type: string
+            siteWeb:
+              type: string
+              format: uri
+              nullable: true
+            statut:
+              $ref: '#/components/schemas/StatutAgence'
+            dateCreation:
+              type: string
+              format: date-time
+
+    PageAgence:
+      type: object
+      properties:
+        contenu:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgenceListeResponse'
+        pageActuelle:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+
+    # ─── MOYEN TRANSPORT ─────────
+
+    MoyenTransportResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        libelle:
+          type: string
+          example: Bus
+        description:
+          type: string
+
+    # ─── VÉHICULE ────────────────
+
+    VehiculeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        numeroVehicule:
+          type: string
+        marque:
+          type: string
+          example: Mercedes-Benz
+        immatriculation:
+          type: string
+          example: LT-1234-A
+        capacite:
+          type: integer
+          example: 45
+        typeClasse:
+          $ref: '#/components/schemas/TypeClasse'
+        moyenTransport:
+          $ref: '#/components/schemas/MoyenTransportResponse'
+
+    # ─── VOYAGE ──────────────────
+
+    VoyageListeResponse:
+      type: object
+      description: Données affichées dans la liste des voyages
+      properties:
+        id:
+          type: integer
+          format: int64
+        numeroVoyage:
+          type: string
+          example: VY-2026-001
+        agence:
+          $ref: '#/components/schemas/AgenceListeResponse'
+        villeDepart:
+          type: string
+          example: Douala
+        gareDepart:
+          type: string
+          example: Gare Routière Bonabéri
+        villeArrivee:
+          type: string
+          example: Yaoundé
+        gareArrivee:
+          type: string
+          example: Gare Centrale
+        dateDepart:
+          type: string
+          format: date
+          example: "2026-06-10"
+        heureDepart:
+          type: string
+          example: "08:00"
+        heureArriveeEstimee:
+          type: string
+          example: "12:00"
+        dureeEstimee:
+          type: string
+          example: "4h00"
+        typeClasse:
+          $ref: '#/components/schemas/TypeClasse'
+        placesRestantes:
+          type: integer
+          example: 12
+        prixNormal:
+          type: number
+          example: 5000
+        prixPromo:
+          type: number
+          nullable: true
+          example: 4500
+        devise:
+          type: string
+          example: FCFA
+        statut:
+          $ref: '#/components/schemas/StatutVoyage'
+        noteMoyenne:
+          type: number
+          format: float
+          example: 4.2
+
+    VoyageDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/VoyageListeResponse'
+        - type: object
+          properties:
+            vehicule:
+              $ref: '#/components/schemas/VehiculeResponse'
+            bagage:
+              type: string
+              nullable: true
+              example: "23kg max"
+            description:
+              type: string
+              nullable: true
+
+    PageVoyageListeResponse:
+      type: object
+      properties:
+        contenu:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoyageListeResponse'
+        pageActuelle:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+
+    # ─── SIÈGE ───────────────────
+
+    SiegeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        numeroSiege:
+          type: string
+          example: A3
+        statut:
+          $ref: '#/components/schemas/StatutSiege'
+
+    # ─── RÉSERVATION ─────────────
+
+    CreerReservationRequest:
+      type: object
+      required: [voyageId, siegeId, nomComplet, telephone, email, numeroPieceIdentite]
+      properties:
+        voyageId:
+          type: integer
+          format: int64
+          description: ID du voyage choisi
+        siegeId:
+          type: integer
+          format: int64
+          description: ID du siège sélectionné
+        nomComplet:
+          type: string
+          description: Nom complet du voyageur
+          example: Jean Mbarga
+        telephone:
+          type: string
+          example: "+237690000000"
+        email:
+          type: string
+          format: email
+        numeroPieceIdentite:
+          type: string
+          description: Numéro CNI ou Passeport
+          example: "123456789"
+        contactUrgenceNom:
+          type: string
+          nullable: true
+          description: Nom de la personne à contacter en cas d'urgence (optionnel)
+        contactUrgenceTelephone:
+          type: string
+          nullable: true
+          description: Téléphone de la personne à contacter en cas d'urgence (optionnel)
+        accepteConditions:
+          type: boolean
+          description: L'utilisateur a accepté les conditions générales
+          example: true
+
+    ReservationListeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        voyage:
+          $ref: '#/components/schemas/VoyageListeResponse'
+        siege:
+          $ref: '#/components/schemas/SiegeResponse'
+        montant:
+          type: number
+        statut:
+          $ref: '#/components/schemas/StatutReservation'
+        dateReservation:
+          type: string
+          format: date-time
+
+    ReservationDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReservationListeResponse'
+        - type: object
+          properties:
+            nomComplet:
+              type: string
+            telephone:
+              type: string
+            email:
+              type: string
+              format: email
+            numeroPieceIdentite:
+              type: string
+            contactUrgenceNom:
+              type: string
+              nullable: true
+            contactUrgenceTelephone:
+              type: string
+              nullable: true
+            paiement:
+              $ref: '#/components/schemas/PaiementResponse'
+              nullable: true
+            ticket:
+              $ref: '#/components/schemas/TicketResponse'
+              nullable: true
+            facture:
+              $ref: '#/components/schemas/FactureResponse'
+              nullable: true
+
+    PageReservationResponse:
+      type: object
+      properties:
+        contenu:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationListeResponse'
+        pageActuelle:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+
+    # ─── PAIEMENT ────────────────
+
+    InitierPaiementRequest:
+      type: object
+      required: [reservationId, methode]
+      properties:
+        reservationId:
+          type: integer
+          format: int64
+        methode:
+          $ref: '#/components/schemas/MethodePaiement'
+        numeroPaiement:
+          type: string
+          nullable: true
+          description: Numéro de téléphone Mobile Money (Orange Money / MTN MoMo)
+          example: "+237690000000"
+
+    InitierPaiementResponse:
+      type: object
+      properties:
+        paiementId:
+          type: integer
+          format: int64
+        referenceTransaction:
+          type: string
+          description: Référence de transaction à conserver côté client
+        urlPaiement:
+          type: string
+          format: uri
+          nullable: true
+          description: URL de redirection pour carte bancaire ou PayPal
+        instructionsPaiement:
+          type: string
+          nullable: true
+          description: Instructions pour valider le paiement Mobile Money
+          example: "Composez #150*6*1*5000# pour confirmer"
+        statut:
+          $ref: '#/components/schemas/StatutPaiement'
+
+    ConfirmerPaiementRequest:
+      type: object
+      required: [referenceTransaction, statut]
+      properties:
+        referenceTransaction:
+          type: string
+        statut:
+          $ref: '#/components/schemas/StatutPaiement'
+        codeConfirmation:
+          type: string
+          nullable: true
+
+    ConfirmerPaiementResponse:
+      type: object
+      properties:
+        paiement:
+          $ref: '#/components/schemas/PaiementResponse'
+        reservation:
+          $ref: '#/components/schemas/ReservationDetailResponse'
+        message:
+          type: string
+          example: Paiement confirmé. Votre ticket a été généré et envoyé par email.
+
+    PaiementResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        montant:
+          type: number
+        methode:
+          $ref: '#/components/schemas/MethodePaiement'
+        referenceTransaction:
+          type: string
+        datePaiement:
+          type: string
+          format: date-time
+        statut:
+          $ref: '#/components/schemas/StatutPaiement'
+
+    # ─── FACTURE ─────────────────
+
+    FactureResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        numeroFacture:
+          type: string
+          example: FAC-2026-0001
+        dateGeneration:
+          type: string
+          format: date-time
+        montant:
+          type: number
+        pdfUrl:
+          type: string
+          format: uri
+          description: URL pour télécharger la facture PDF
+
+    # ─── TICKET ──────────────────
+
+    TicketResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        codeTicket:
+          type: string
+          description: Code unique du ticket (encodé dans le QR Code)
+          example: TKT-20260610-A3-00123
+        qrCodeBase64:
+          type: string
+          description: Image QR Code encodée en Base64 (PNG)
+        qrCodeUrl:
+          type: string
+          format: uri
+          description: URL vers l'image du QR Code
+        dateGeneration:
+          type: string
+          format: date-time
+        dateExpiration:
+          type: string
+          format: date-time
+          description: Date à laquelle le ticket expire (généralement après le voyage)
+        statut:
+          $ref: '#/components/schemas/StatutTicket'
+        reservationId:
+          type: integer
+          format: int64
+
+    ValidationTicketResponse:
+      type: object
+      properties:
+        valide:
+          type: boolean
+        message:
+          type: string
+          example: Ticket valide. Bon voyage !
+        ticket:
+          $ref: '#/components/schemas/TicketResponse'
+        voyageur:
+          type: object
+          properties:
+            nomComplet:
+              type: string
+            numeroSiege:
+              type: string
+            villeDepart:
+              type: string
+            villeArrivee:
+              type: string
+
+    # ─── AVIS ────────────────────
+
+    CreerAvisRequest:
+      type: object
+      required: [agenceId, note]
+      properties:
+        agenceId:
+          type: integer
+          format: int64
+        note:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Note de 1 à 5 étoiles
+        commentaire:
+          type: string
+          nullable: true
+          maxLength: 1000
+
+    AvisResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        note:
+          type: integer
+          minimum: 1
+          maximum: 5
+        commentaire:
+          type: string
+          nullable: true
+        dateAvis:
+          type: string
+          format: date-time
+        utilisateur:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            prenom:
+              type: string
+            photoProfilUrl:
+              type: string
+              format: uri
+              nullable: true
+        agenceId:
+          type: integer
+          format: int64
+
+    PageAvis:
+      type: object
+      properties:
+        contenu:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvisResponse'
+        noteMoyenne:
+          type: number
+          format: float
+        totalAvis:
+          type: integer
+        pageActuelle:
+          type: integer
+        totalPages:
+          type: integer
+
+    # ─── UTILITAIRES ─────────────
+
+    ApiSuccess:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Opération effectuée avec succès
+        timestamp:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: RESSOURCE_INTROUVABLE
+        message:
+          type: string
+          example: Le voyage demandé n'existe pas
+        details:
+          type: array
+          nullable: true
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+        chemin:
+          type: string
+          example: /api/v1/voyages/999
