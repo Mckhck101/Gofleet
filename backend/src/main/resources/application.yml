@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gofleet-backend
+  mvc:
+    contentnegotiation:
+      favor-parameter: false
+      favor-path-extension: false
+      default-content-type: application/json
+  datasource:
+    url: jdbc:mysql://localhost:3306/gofleet?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+app:
+  jwt:
+    secret: "gofleet-demo-secret-key-change-me-in-production-with-64-characters-minimum"
+    expiration-seconds: 86400
+    refresh-expiration-seconds: 604800
+
+springdoc:
+  swagger-ui:
+    path: /api/v1/swagger-ui.html
+  api-docs:
+    path: /api/v1/v3/api-docs
