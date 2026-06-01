@@ -1,0 +1,34 @@
+# Maven / Spring Boot
+target/
+backend/target/
+*.class
+
+# Java
+*.jar
+*.war
+*.ear
+
+# Environment
+.env
+application-local.yml
+backend/src/main/resources/application-local.yml
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node / React Native
+node_modules/
+mobile-app/node_modules/
+.expo/
+mobile-app/.expo/
+dist/
+build/

@@ -64,11 +64,9 @@ To become the leading intelligent mobility platform in Central Africa by combini
 * Taxi Reservation at Arrival
 * Reviews and Ratings
 
-### Multilingual Support
+### Language
 
 * French
-* English
-* Local Languages
 
 ## System Architecture
 
@@ -134,6 +132,14 @@ External Services
 ## Team
 
 Gofleet Development Team
+
+- Cris Nevyl
+- Edzoa Ahanda
+- Manga Patrice
+- Chenoassi Yvan
+- Tallin Alexandre
+- Tchassem Azazel Edwin
+
 
 ## Project Type
 
