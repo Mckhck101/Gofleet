@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Réservation Voyage",
+    "slug": "reservation-voyage",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "reservationvoyage",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A56DB"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "cm.reservationvoyage.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#1A56DB"
+      },
+      "package": "cm.reservationvoyage.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser l'accès à vos photos pour uploader votre pièce d'identité."
+        }
+      ],
+      "expo-font",
+      "expo-localization",
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
