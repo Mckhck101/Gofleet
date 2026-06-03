@@ -26,7 +26,7 @@ interface SearchState {
 const initialState = {
     villeDepart: "",
     villeArrivee: "",
-    dateDepart: new Date().toISOString().split("T")[0],
+    dateDepart: "",
     typeClasse: undefined,
     prixMin: undefined,
     prixMax: undefined,

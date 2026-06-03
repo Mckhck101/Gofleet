@@ -34,7 +34,9 @@ import {
 import { useTranslation } from "react-i18next";
 import colors from "@/constants/colors";
 import { useAuthStore } from "@/store/authStore";
-import { useSearchStore } from "@/store/searchStore";
+import { useDeconnexion } from "@/hooks/useAuth";
+import { useMettreAJourProfil, useMonProfil } from "@/hooks/useUtilisateur";
+import { MiseAJourProfilRequest, StatutVerification, UtilisateurResponse } from "@/types/utilisateur";
 import BurgerMenu from "@/components/ui/BurgerMenu";
 import ChatPanel from "@/components/ui/ChatPanel";
 import FloatingChatButton from "@/components/ui/FloatingChatButton";
@@ -43,38 +45,9 @@ import { List } from "phosphor-react-native";
 
 
 // ─── Types (depuis les schemas OpenAPI) ─────────────────────
-type StatutVerification = "NON_VERIFIE" | "EN_COURS" | "VERIFIE";
 type Sexe = "M" | "F";
 
-interface UtilisateurResponse {
-    id: number;
-    nom: string;
-    prenom: string;
-    email: string;
-    telephone: string;
-    dateNaissance: string;
-    sexe: Sexe;
-    photoProfilUrl?: string | null;
-    numeroCni?: string | null;
-    statutVerification: StatutVerification;
-    dateCreation: string;
-}
-
 // ─── Mock user (sera remplacé par les données du store/API) ──
-const mockUser: UtilisateurResponse = {
-    id: 1,
-    nom: "Mbarga",
-    prenom: "Jean",
-    email: "jean.mbarga@gmail.com",
-    telephone: "+237690000000",
-    dateNaissance: "1995-04-15",
-    sexe: "M",
-    photoProfilUrl: null,
-    numeroCni: "123456789",
-    statutVerification: "VERIFIE",
-    dateCreation: "2024-01-10T10:00:00Z",
-};
-
 // ─── Helpers ─────────────────────────────────────────────────
 const formatDateDisplay = (dateStr: string): string => {
     if (!dateStr) return "";
@@ -563,10 +536,35 @@ const sexeStyles = StyleSheet.create({
     optionTextActive: { color: colors.primary },
 });
 
+const emptyUser: UtilisateurResponse = {
+    id: 0,
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    dateNaissance: "",
+    sexe: "M",
+    photoProfilUrl: null,
+    numeroCni: null,
+    statutVerification: "NON_VERIFIE",
+    dateCreation: new Date().toISOString(),
+};
+
 // ─── Écran Principal ─────────────────────────────────────────
 export default function ProfilScreen() {
     const { t } = useTranslation();
-    const [user, setUser] = useState<UtilisateurResponse>(mockUser);
+    const { utilisateur, setUtilisateur } = useAuthStore();
+    const { data: profilApi } = useMonProfil();
+    const updateProfil = useMettreAJourProfil();
+    const deconnexion = useDeconnexion();
+    const [user, setUser] = useState<UtilisateurResponse>(
+        utilisateur ?? profilApi ?? emptyUser
+    );
+
+    React.useEffect(() => {
+        const nextUser = profilApi ?? utilisateur;
+        if (nextUser) setUser(nextUser);
+    }, [profilApi, utilisateur]);
 
     const [modalNom, setModalNom] = useState(false);
     const [modalContact, setModalContact] = useState(false);
@@ -576,29 +574,46 @@ export default function ProfilScreen() {
     const [menuVisible, setMenuVisible] = useState(false);
 
     // ── Handlers (branchés sur PUT /utilisateurs/moi) ──────────
+    const saveProfile = (payload: MiseAJourProfilRequest) => {
+        const optimisticUser = { ...user, ...payload };
+        setUser(optimisticUser);
+        setUtilisateur(optimisticUser);
+        updateProfil.mutate(payload, {
+            onError: (error: any) => {
+                const message =
+                    error?.response?.data?.message ??
+                    "Impossible de mettre le profil a jour pour le moment.";
+                Alert.alert("Profil", message);
+                const previousUser = profilApi ?? utilisateur;
+                if (previousUser) {
+                    setUser(previousUser);
+                    setUtilisateur(previousUser);
+                }
+            },
+        });
+    };
+
     const handleSaveNom = (v: Record<string, string>) => {
-        setUser((u) => ({ ...u, nom: v.nom, prenom: v.prenom }));
-        // TODO: api.put('/utilisateurs/moi', { nom: v.nom, prenom: v.prenom })
+        saveProfile({ nom: v.nom.trim(), prenom: v.prenom.trim() });
     };
 
     const handleSaveContact = (v: Record<string, string>) => {
-        setUser((u) => ({ ...u, telephone: v.telephone, email: v.email }));
-        // TODO: api.put('/utilisateurs/moi', { telephone: v.telephone, email: v.email })
+        saveProfile({ telephone: v.telephone.trim() });
+        if (v.email.trim() !== user.email) {
+            Alert.alert("Email", "Le changement d'email sera ajoute dans une prochaine version.");
+        }
     };
 
     const handleSaveIdentite = (v: Record<string, string>) => {
-        setUser((u) => ({ ...u, numeroCni: v.numeroCni }));
-        // TODO: api.put('/utilisateurs/moi', { numeroCni: v.numeroCni })
+        saveProfile({ numeroCni: v.numeroCni.trim() });
     };
 
     const handleSaveDate = (date: string) => {
-        setUser((u) => ({ ...u, dateNaissance: date }));
-        // TODO: api.put('/utilisateurs/moi', { dateNaissance: date })
+        saveProfile({ dateNaissance: date });
     };
 
     const handleSaveSexe = (sexe: Sexe) => {
-        setUser((u) => ({ ...u, sexe }));
-        // TODO: api.put('/utilisateurs/moi', { sexe })
+        saveProfile({ sexe });
     };
 
     const handleDeconnexion = () => {
@@ -610,9 +625,7 @@ export default function ProfilScreen() {
                 {
                     text: t("auth.deconnexion"),
                     style: "destructive",
-                    onPress: () => {
-                        // TODO: api.post('/auth/deconnexion') puis navigation
-                    },
+                    onPress: () => deconnexion.mutate(),
                 },
             ]
         );

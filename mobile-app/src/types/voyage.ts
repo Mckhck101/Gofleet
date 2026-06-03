@@ -70,7 +70,7 @@ export interface SiegeResponse {
 export interface RechercheVoyageParams {
     villeDepart: string;
     villeArrivee: string;
-    dateDepart: string;
+    dateDepart?: string;
     typeClasse?: TypeClasse;
     prixMin?: number;
     prixMax?: number;

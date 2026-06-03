@@ -201,6 +201,21 @@ export default function AccueilScreen() {
         router.push("/voyages/resultats" as any);
     }
 
+    function ouvrirRecherche(depart: string, arrivee: string, date = "") {
+        setVilleDepart(depart);
+        setVilleArrivee(arrivee);
+        setDateDepart(date);
+        router.push("/voyages/resultats" as any);
+    }
+
+    function ouvrirTousLesVoyages() {
+        ouvrirRecherche(
+            villeDepart || "Douala",
+            villeArrivee || "Yaounde",
+            dateDepart
+        );
+    }
+
     function swapVilles() {
         const tmp = villeDepart;
         setVilleDepart(villeArrivee);
@@ -436,7 +451,16 @@ export default function AccueilScreen() {
                             <TouchableOpacity
                                 key={i}
                                 style={styles.chip}
-                                onPress={() => setVilleArrivee(ville)}
+                                onPress={() =>
+                                    ouvrirRecherche(
+                                        villeDepart && villeDepart !== ville
+                                            ? villeDepart
+                                            : ville === "Douala"
+                                            ? "Yaounde"
+                                            : "Douala",
+                                        ville
+                                    )
+                                }
                                 activeOpacity={0.75}
                             >
                                 <MapPin
@@ -481,6 +505,11 @@ export default function AccueilScreen() {
                                             promo.couleurDeg[0],
                                     },
                                 ]}
+                                onPress={() =>
+                                    promo.id === 1
+                                        ? ouvrirRecherche("Douala", "Yaounde")
+                                        : ouvrirRecherche("Yaounde", "Bafoussam")
+                                }
                                 activeOpacity={0.88}
                             >
                                 <View style={styles.promoContent}>
@@ -521,11 +550,7 @@ export default function AccueilScreen() {
                             </Text>
                         </View>
                         <TouchableOpacity
-                            onPress={() =>
-                                router.push(
-                                    "/voyages/resultats" as any
-                                )
-                            }
+                            onPress={ouvrirTousLesVoyages}
                         >
                             <Text style={styles.voirTout}>
                                 Voir tout
@@ -538,8 +563,9 @@ export default function AccueilScreen() {
                             key={voyage.id}
                             style={styles.voyageCard}
                             onPress={() =>
-                                router.push(
-                                    `/voyages/${voyage.id}` as any
+                                ouvrirRecherche(
+                                    voyage.villeDepart,
+                                    voyage.villeArrivee
                                 )
                             }
                             activeOpacity={0.88}

@@ -29,8 +29,7 @@ export function useRechercheVoyages(
         enabled:
             enabled &&
             !!params.villeDepart &&
-            !!params.villeArrivee &&
-            !!params.dateDepart,
+            !!params.villeArrivee,
     });
 }
 

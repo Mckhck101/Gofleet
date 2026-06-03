@@ -1,32 +1,34 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    TextInput,
-    ScrollView,
-    KeyboardAvoidingView,
-    Platform,
+    ActivityIndicator,
     Animated,
     Dimensions,
-    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-    X,
     PaperPlaneTilt,
     Robot,
     User,
-    SparkleIcon,
+    X,
 } from "phosphor-react-native";
 import { useTranslation } from "react-i18next";
 import colors from "@/constants/colors";
+import config from "@/constants/config";
 
 const { height: H } = Dimensions.get("window");
 
+type Role = "user" | "assistant";
+
 interface Message {
     id: string;
-    role: "user" | "assistant";
+    role: Role;
     content: string;
     timestamp: Date;
 }
@@ -38,28 +40,48 @@ interface ChatPanelProps {
     agenceId?: number;
 }
 
+const GOFLEET_CONTEXT = `
+Gofleet est une application mobile de reservation de voyages au Cameroun.
+Fonctions disponibles en V1:
+- inscription, connexion, profil utilisateur;
+- recherche de voyages par ville de depart, ville d'arrivee et date optionnelle;
+- recherche vocale qui remplit la recherche;
+- resultats de voyages, detail voyage, selection de siege;
+- informations voyageur, paiement simule et confirmation;
+- onglets reservations, historique statique, favoris statiques, profil;
+- agences populaires et assistant d'agence.
+Donnees de demonstration utiles:
+- Douala -> Yaounde avec Touristique Express, bus, environ 5000 FCFA;
+- Yaounde -> Ngaoundere avec Camrail Voyage, train, environ 12000 FCFA;
+- Douala -> Garoua avec Gofleet Air, avion, environ 85000 FCFA.
+Regles:
+- reponds en francais, de maniere courte, claire et chaleureuse;
+- guide l'utilisateur dans l'app quand c'est utile;
+- n'invente pas une reservation, un paiement confirme ou une disponibilite certaine;
+- si la question est technique, demande le message d'erreur exact et propose une verification simple.
+`.trim();
+
 export default function ChatPanel({
     visible,
     onClose,
     agenceNom,
-    agenceId,
 }: ChatPanelProps) {
-    const { t }        = useTranslation();
-    const [messages, setMessages] = useState<Message[]>([
+    const { t } = useTranslation();
+    const [messages, setMessages] = useState<Message[]>(() => [
         {
             id: "0",
             role: "assistant",
             content: agenceNom
-                ? `Bonjour ! Je suis l'assistant de **${agenceNom}**. Comment puis-je vous aider ?`
-                : `Bonjour ! Je suis votre assistant ${t("common.appName")}. Je peux vous aider à trouver un voyage, gérer vos réservations ou répondre à vos questions.`,
+                ? `Bonjour ! Je suis l'assistant de ${agenceNom}. Comment puis-je vous aider ?`
+                : `Bonjour ! Je suis votre assistant ${t("common.appName")}. Je peux vous aider pour les voyages, reservations, paiements et profils.`,
             timestamp: new Date(),
         },
     ]);
-    const [input, setInput]       = useState("");
-    const [loading, setLoading]   = useState(false);
-    const scrollRef               = useRef<ScrollView>(null);
-    const slideY                  = useRef(new Animated.Value(H)).current;
-    const opacity                 = useRef(new Animated.Value(0)).current;
+    const [input, setInput] = useState("");
+    const [loading, setLoading] = useState(false);
+    const slideY = useRef(new Animated.Value(H)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+    const scrollRef = useRef<ScrollView>(null);
 
     useEffect(() => {
         if (visible) {
@@ -72,7 +94,7 @@ export default function ChatPanel({
                 }),
                 Animated.timing(opacity, {
                     toValue: 1,
-                    duration: 250,
+                    duration: 220,
                     useNativeDriver: true,
                 }),
             ]).start();
@@ -80,94 +102,132 @@ export default function ChatPanel({
             Animated.parallel([
                 Animated.timing(slideY, {
                     toValue: H,
-                    duration: 280,
+                    duration: 240,
                     useNativeDriver: true,
                 }),
                 Animated.timing(opacity, {
                     toValue: 0,
-                    duration: 220,
+                    duration: 180,
                     useNativeDriver: true,
                 }),
             ]).start();
         }
-    }, [visible]);
+    }, [visible, opacity, slideY]);
 
     useEffect(() => {
-        setTimeout(
-            () => scrollRef.current?.scrollToEnd({ animated: true }),
-            100
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    }, [messages, loading]);
+
+    function systemPrompt() {
+        const scope = agenceNom
+            ? `Tu es l'assistant client de l'agence "${agenceNom}" dans Gofleet.`
+            : `Tu es l'assistant de l'application ${t("common.appName")}.`;
+
+        return `${scope}\n\n${GOFLEET_CONTEXT}`;
+    }
+
+    function fallbackReply(question: string) {
+        const lower = question.toLowerCase();
+
+        if (lower.includes("reservation") || lower.includes("reserver")) {
+            return "Pour reserver: Accueil -> recherche du trajet -> detail du voyage -> choix du siege -> paiement simule -> confirmation.";
+        }
+        if (lower.includes("paiement") || lower.includes("payer")) {
+            return "Dans cette V1, le paiement est simule. Choisissez une methode, confirmez, puis verifiez la page de confirmation.";
+        }
+        if (lower.includes("profil")) {
+            return "Allez dans l'onglet Profil pour consulter ou modifier vos informations principales.";
+        }
+        if (lower.includes("voyage") || lower.includes("trajet")) {
+            return "Depuis l'accueil, entrez une ville de depart et une ville d'arrivee. La date est optionnelle pour afficher plus de resultats.";
+        }
+
+        return "Je peux vous aider sur les voyages, reservations, paiements simules, agences et profil Gofleet. Posez-moi votre question en une phrase.";
+    }
+
+    async function askGemini(userText: string) {
+        if (!config.GEMINI_API_KEY) {
+            return fallbackReply(userText);
+        }
+
+        const history = messages
+            .filter((message) => message.id !== "0")
+            .slice(-8)
+            .map((message) => ({
+                role: message.role === "assistant" ? "model" : "user",
+                parts: [{ text: message.content }],
+            }));
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent?key=${config.GEMINI_API_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt() }],
+                    },
+                    contents: [
+                        ...history,
+                        {
+                            role: "user",
+                            parts: [{ text: userText }],
+                        },
+                    ],
+                    generationConfig: {
+                        temperature: 0.4,
+                        maxOutputTokens: 600,
+                    },
+                }),
+            }
         );
-    }, [messages]);
+
+        if (!response.ok) {
+            return fallbackReply(userText);
+        }
+
+        const data = await response.json();
+        return (
+            data.candidates?.[0]?.content?.parts
+                ?.map((part: any) => part.text)
+                .filter(Boolean)
+                .join("") || fallbackReply(userText)
+        );
+    }
 
     async function sendMessage() {
-        if (!input.trim() || loading) return;
+        const text = input.trim();
+        if (!text || loading) return;
 
-        const userMsg: Message = {
+        const userMessage: Message = {
             id: Date.now().toString(),
             role: "user",
-            content: input.trim(),
+            content: text,
             timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, userMsg]);
+        setMessages((prev) => [...prev, userMessage]);
         setInput("");
         setLoading(true);
 
         try {
-            const systemPrompt = agenceNom
-                ? `Tu es l'assistant client de l'agence de voyage "${agenceNom}" au Cameroun. Réponds de manière professionnelle et concise en français. Tu aides les clients avec leurs questions sur les voyages, réservations et services de cette agence.`
-                : `Tu es un assistant de voyage pour l'application ${t("common.appName")} au Cameroun. Tu aides les utilisateurs à trouver des voyages, gérer leurs réservations et répondre à leurs questions. Sois concis, professionnel et chaleureux.`;
-
-            const response = await fetch(
-                "https://api.anthropic.com/v1/messages",
+            const answer = await askGemini(text);
+            setMessages((prev) => [
+                ...prev,
                 {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 1000,
-                        system: systemPrompt,
-                        messages: [
-                            ...messages
-                                .filter((m) => m.id !== "0")
-                                .map((m) => ({
-                                    role: m.role,
-                                    content: m.content,
-                                })),
-                            {
-                                role: "user",
-                                content: input.trim(),
-                            },
-                        ],
-                    }),
-                }
-            );
-
-            const data = await response.json();
-            const text =
-                data.content
-                    ?.filter((b: any) => b.type === "text")
-                    .map((b: any) => b.text)
-                    .join("") ?? "Désolé, je n'ai pas pu répondre.";
-
-            const assistantMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: text,
-                timestamp: new Date(),
-            };
-
-            setMessages((prev) => [...prev, assistantMsg]);
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: answer,
+                    timestamp: new Date(),
+                },
+            ]);
         } catch {
             setMessages((prev) => [
                 ...prev,
                 {
                     id: (Date.now() + 1).toString(),
                     role: "assistant",
-                    content:
-                        "Désolé, une erreur est survenue. Veuillez réessayer.",
+                    content: fallbackReply(text),
                     timestamp: new Date(),
                 },
             ]);
@@ -180,7 +240,6 @@ export default function ChatPanel({
 
     return (
         <View style={StyleSheet.absoluteFill}>
-            {/* Overlay */}
             <Animated.View style={[styles.overlay, { opacity }]}>
                 <TouchableOpacity
                     style={StyleSheet.absoluteFill}
@@ -189,82 +248,59 @@ export default function ChatPanel({
                 />
             </Animated.View>
 
-            {/* Panel */}
-            <Animated.View
-                style={[
-                    styles.panel,
-                    { transform: [{ translateY: slideY }] },
-                ]}
-            >
+            <Animated.View style={[styles.panel, { transform: [{ translateY: slideY }] }]}>
                 <KeyboardAvoidingView
                     style={styles.flex}
-                    behavior={
-                        Platform.OS === "ios" ? "padding" : undefined
-                    }
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
                 >
-                    {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.botIconCircle}>
-                                <Robot
-                                    size={22}
-                                    color={colors.white}
-                                    weight="fill"
-                                />
+                                <Robot size={22} color={colors.white} weight="fill" />
                             </View>
                             <View>
                                 <Text style={styles.headerTitle}>
-                                    {agenceNom
-                                        ? `Assistant ${agenceNom}`
-                                        : "Assistant IA"}
+                                    {agenceNom ? `Assistant ${agenceNom}` : "Assistant IA"}
                                 </Text>
                                 <View style={styles.onlineRow}>
                                     <View style={styles.onlineDot} />
                                     <Text style={styles.onlineText}>
-                                        En ligne
+                                        {config.GEMINI_API_KEY ? "Gemini connecte" : "Mode aide locale"}
                                     </Text>
                                 </View>
                             </View>
                         </View>
-                        <TouchableOpacity
-                            onPress={onClose}
-                            style={styles.closeBtn}
-                        >
+                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                             <X size={20} color={colors.gray500} />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Messages */}
                     <ScrollView
                         ref={scrollRef}
                         style={styles.messagesList}
                         contentContainerStyle={styles.messagesContent}
                         showsVerticalScrollIndicator={false}
                     >
-                        {messages.map((msg) => (
+                        {messages.map((message) => (
                             <View
-                                key={msg.id}
+                                key={message.id}
                                 style={[
                                     styles.msgRow,
-                                    msg.role === "user"
+                                    message.role === "user"
                                         ? styles.msgRowUser
                                         : styles.msgRowAssistant,
                                 ]}
                             >
-                                {msg.role === "assistant" ? (
+                                {message.role === "assistant" ? (
                                     <View style={styles.msgAvatar}>
-                                        <Robot
-                                            size={16}
-                                            color={colors.primary}
-                                            weight="fill"
-                                        />
+                                        <Robot size={16} color={colors.primary} weight="fill" />
                                     </View>
                                 ) : null}
 
                                 <View
                                     style={[
                                         styles.bubble,
-                                        msg.role === "user"
+                                        message.role === "user"
                                             ? styles.bubbleUser
                                             : styles.bubbleAssistant,
                                     ]}
@@ -272,38 +308,31 @@ export default function ChatPanel({
                                     <Text
                                         style={[
                                             styles.bubbleText,
-                                            msg.role === "user"
+                                            message.role === "user"
                                                 ? styles.bubbleTextUser
                                                 : styles.bubbleTextAssistant,
                                         ]}
                                     >
-                                        {msg.content}
+                                        {message.content}
                                     </Text>
                                     <Text
                                         style={[
                                             styles.bubbleTime,
-                                            msg.role === "user"
+                                            message.role === "user"
                                                 ? styles.bubbleTimeUser
                                                 : styles.bubbleTimeAssistant,
                                         ]}
                                     >
-                                        {msg.timestamp.toLocaleTimeString(
-                                            "fr-FR",
-                                            {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            }
-                                        )}
+                                        {message.timestamp.toLocaleTimeString("fr-FR", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        })}
                                     </Text>
                                 </View>
 
-                                {msg.role === "user" ? (
+                                {message.role === "user" ? (
                                     <View style={styles.msgAvatarUser}>
-                                        <User
-                                            size={16}
-                                            color={colors.white}
-                                            weight="fill"
-                                        />
+                                        <User size={16} color={colors.white} weight="fill" />
                                     </View>
                                 ) : null}
                             </View>
@@ -312,24 +341,19 @@ export default function ChatPanel({
                         {loading ? (
                             <View style={styles.typingRow}>
                                 <View style={styles.msgAvatar}>
-                                    <Robot
-                                        size={16}
-                                        color={colors.primary}
-                                        weight="fill"
-                                    />
+                                    <Robot size={16} color={colors.primary} weight="fill" />
                                 </View>
                                 <View style={styles.typingBubble}>
-                                    <TypingDots />
+                                    <ActivityIndicator size="small" color={colors.primary} />
                                 </View>
                             </View>
                         ) : null}
                     </ScrollView>
 
-                    {/* Input */}
                     <View style={styles.inputBar}>
                         <TextInput
                             style={styles.textInput}
-                            placeholder="Écrivez votre message..."
+                            placeholder="Ecrivez votre message..."
                             placeholderTextColor={colors.gray400}
                             value={input}
                             onChangeText={setInput}
@@ -341,23 +365,15 @@ export default function ChatPanel({
                             onPress={sendMessage}
                             style={[
                                 styles.sendBtn,
-                                (!input.trim() || loading) &&
-                                    styles.sendBtnDisabled,
+                                (!input.trim() || loading) && styles.sendBtnDisabled,
                             ]}
                             disabled={!input.trim() || loading}
                             activeOpacity={0.8}
                         >
                             {loading ? (
-                                <ActivityIndicator
-                                    size="small"
-                                    color={colors.white}
-                                />
+                                <ActivityIndicator size="small" color={colors.white} />
                             ) : (
-                                <PaperPlaneTilt
-                                    size={18}
-                                    color={colors.white}
-                                    weight="fill"
-                                />
+                                <PaperPlaneTilt size={18} color={colors.white} weight="fill" />
                             )}
                         </TouchableOpacity>
                     </View>
@@ -366,75 +382,6 @@ export default function ChatPanel({
         </View>
     );
 }
-
-// ─── Points de frappe animés ──────────────────────────────────
-function TypingDots() {
-    const dots = [
-        useRef(new Animated.Value(0)).current,
-        useRef(new Animated.Value(0)).current,
-        useRef(new Animated.Value(0)).current,
-    ];
-
-    useEffect(() => {
-        const anims = dots.map((dot, i) =>
-            Animated.loop(
-                Animated.sequence([
-                    Animated.delay(i * 150),
-                    Animated.timing(dot, {
-                        toValue: 1,
-                        duration: 300,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(dot, {
-                        toValue: 0,
-                        duration: 300,
-                        useNativeDriver: true,
-                    }),
-                ])
-            )
-        );
-        anims.forEach((a) => a.start());
-        return () => anims.forEach((a) => a.stop());
-    }, []);
-
-    return (
-        <View style={typingStyles.row}>
-            {dots.map((dot, i) => (
-                <Animated.View
-                    key={i}
-                    style={[
-                        typingStyles.dot,
-                        {
-                            transform: [
-                                {
-                                    translateY: dot.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [0, -4],
-                                    }),
-                                },
-                            ],
-                        },
-                    ]}
-                />
-            ))}
-        </View>
-    );
-}
-
-const typingStyles = StyleSheet.create({
-    row: {
-        flexDirection: "row",
-        gap: 4,
-        alignItems: "center",
-        paddingVertical: 4,
-    },
-    dot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: colors.gray400,
-    },
-});
 
 const styles = StyleSheet.create({
     flex: { flex: 1 },
@@ -457,8 +404,6 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 20,
     },
-
-    // ─── Header ──────────────────────────────────
     header: {
         flexDirection: "row",
         alignItems: "center",
@@ -511,8 +456,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-
-    // ─── Messages ─────────────────────────────────
     messagesList: { flex: 1 },
     messagesContent: {
         paddingHorizontal: 16,
@@ -557,14 +500,18 @@ const styles = StyleSheet.create({
         backgroundColor: colors.gray100,
         borderBottomLeftRadius: 4,
     },
-    bubbleText: { fontSize: 14, lineHeight: 20 },
+    bubbleText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
     bubbleTextUser: { color: colors.white },
     bubbleTextAssistant: { color: colors.gray800 },
-    bubbleTime: { fontSize: 10, alignSelf: "flex-end" },
+    bubbleTime: {
+        fontSize: 10,
+        alignSelf: "flex-end",
+    },
     bubbleTimeUser: { color: "rgba(255,255,255,0.65)" },
     bubbleTimeAssistant: { color: colors.gray400 },
-
-    // ─── Typing ───────────────────────────────────
     typingRow: {
         flexDirection: "row",
         alignItems: "flex-end",
@@ -577,8 +524,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
     },
-
-    // ─── Input bar ────────────────────────────────
     inputBar: {
         flexDirection: "row",
         alignItems: "flex-end",

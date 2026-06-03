@@ -30,6 +30,8 @@ const config = {
     // Change cette URL quand le backend de ton camarade sera prêt
     BASE_URL: getApiBaseUrl(),
     USE_MOCKS: process.env.EXPO_PUBLIC_USE_MOCKS === "true",
+    GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "",
+    GEMINI_MODEL: process.env.EXPO_PUBLIC_GEMINI_MODEL ?? "gemini-1.5-flash",
 
     // Durée avant expiration du token (en ms) — 1 heure
     TOKEN_EXPIRY: 3600 * 1000,
