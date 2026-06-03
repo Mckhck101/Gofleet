@@ -18,7 +18,20 @@ export interface CreerReservationRequest {
     numeroPieceIdentite: string;
     contactUrgenceNom?: string;
     contactUrgenceTelephone?: string;
+    montant?: number;
     accepteConditions: boolean;
+}
+
+export interface ReservationCreationResponse {
+    id_reservation: number;
+    numero_voyage: string;
+    ville_depart: string;
+    ville_arrivee: string;
+    date_depart: string;
+    heure_depart: string;
+    numero_siege: string;
+    montant: number;
+    statut_reservation: StatutReservation;
 }
 
 export interface ReservationListeResponse {

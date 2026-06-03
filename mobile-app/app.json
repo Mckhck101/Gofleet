@@ -17,6 +17,7 @@
       "bundleIdentifier": "cm.reservationvoyage.app"
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1A56DB"

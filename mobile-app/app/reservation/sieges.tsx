@@ -19,9 +19,9 @@ import {
     CheckCircle,
     ArrowRight,
     Info,
-    Steering,
 } from "phosphor-react-native";
 import { useReservationStore } from "@/store/reservationStore";
+import { useSiegesVoyage } from "@/hooks/useVoyages";
 import AnimatedTrajet from "@/components/voyage/AnimatedTrajet";
 import colors from "@/constants/colors";
 import { formatPrix, labelTypeClasse } from "@/utils/format";
@@ -238,7 +238,16 @@ export default function SiegesScreen() {
 
     const capacite =
         (voyage as any).vehicule?.capacite ?? 32;
-    const sieges   = genererSieges(capacite);
+    const { data: siegesApi } = useSiegesVoyage(voyage.id);
+    const sourceSieges =
+        siegesApi && siegesApi.length > 0
+            ? siegesApi
+            : genererSieges(capacite);
+    const sieges = sourceSieges.map((siege, index) => ({
+        ...siege,
+        rangee: Math.floor(index / 4) + 1,
+        colonne: index % 4,
+    })) as Siege[];
     const couleur  = colors.primary;
 
     const nbDisponibles = sieges.filter(
@@ -300,7 +309,7 @@ export default function SiegesScreen() {
             setSiege({
                 id: siege.id,
                 numeroSiege: siege.numeroSiege,
-                statut: siege.statut,
+                statut: siege.statut as any,
             });
         }
     }
@@ -469,7 +478,7 @@ export default function SiegesScreen() {
                         {/* Avant du bus */}
                         <View style={styles.busAvant}>
                             <View style={styles.busAvantInner}>
-                                <Steering
+                                <Bus
                                     size={22}
                                     color={colors.gray500}
                                     weight="fill"

@@ -12,9 +12,17 @@ const apiClient: AxiosInstance = axios.create({
     },
 });
 
+console.info("Gofleet API URL:", config.BASE_URL);
+
 // ─── Intercepteur Request (ajout token JWT) ───────────────────
 apiClient.interceptors.request.use(
     async (requestConfig: InternalAxiosRequestConfig) => {
+        const url = requestConfig.url ?? "";
+        if (url.startsWith("/auth/")) {
+            delete requestConfig.headers.Authorization;
+            return requestConfig;
+        }
+
         const token = await storage.get(config.STORAGE_KEYS.ACCESS_TOKEN);
         if (token && requestConfig.headers) {
             requestConfig.headers.Authorization = `Bearer ${token}`;

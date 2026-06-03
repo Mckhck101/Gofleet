@@ -9,6 +9,7 @@ import {
     StatusBar,
     TextInput,
     ActivityIndicator,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -27,6 +28,8 @@ import {
     Armchair,
 } from "phosphor-react-native";
 import { useReservationStore } from "@/store/reservationStore";
+import { reservationsApi } from "@/api/reservations";
+import { paiementsApi } from "@/api/paiements";
 import colors from "@/constants/colors";
 import { formatPrix, labelMethodePaiement } from "@/utils/format";
 import { MethodePaiement } from "@/types/paiement";
@@ -179,6 +182,7 @@ export default function PaiementScreen() {
         setMethodePaiement,
         setPaiementId,
         setReservationId,
+        setConfirmationPaiement,
     } = useReservationStore();
 
     const [methodeSelectionnee, setMethodeSelectionnee] =
@@ -280,25 +284,57 @@ export default function PaiementScreen() {
         return true;
     }
 
-    // TODO: Remplacer par →
-    // const { mutate: initierPaiement } = useInitierPaiement();
-    // initierPaiement({ reservationId, methode, numeroPaiement })
     async function handlePayer() {
         if (!valider()) return;
+        if (!infosVoyageur || !voyageSelectionne || !siegeSelectionne) {
+            Alert.alert(
+                "Reservation incomplete",
+                "Choisissez un voyage, un siege et renseignez les informations du voyageur."
+            );
+            return;
+        }
+
         setLoading(true);
 
-        // Simulation appel API
-        // En production :
-        // 1. creerReservation(infosVoyageur) → reservationId
-        // 2. initierPaiement({ reservationId, methode, numero })
-        // 3. confirmerPaiement({ referenceTransaction, statut })
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const reservation = await reservationsApi.creer({
+                voyageId: voyageSelectionne.id,
+                siegeId: siegeSelectionne.id,
+                nomComplet: infosVoyageur.nomComplet ?? "",
+                telephone: infosVoyageur.telephone ?? "",
+                email: infosVoyageur.email ?? "",
+                numeroPieceIdentite: infosVoyageur.numeroPieceIdentite ?? "",
+                contactUrgenceNom: infosVoyageur.contactUrgenceNom,
+                contactUrgenceTelephone: infosVoyageur.contactUrgenceTelephone,
+                montant: prix,
+                accepteConditions: infosVoyageur.accepteConditions === true,
+            });
+
+            const paiement = await paiementsApi.initier({
+                reservationId: reservation.id_reservation,
+                methode: methodeSelectionnee!,
+                numeroPaiement: needsPhone ? numeroPaiement.trim() : undefined,
+            });
+
+            const confirmation = await paiementsApi.confirmer({
+                referenceTransaction: paiement.referenceTransaction,
+                statut: "REUSSI",
+                codeConfirmation: "123456",
+            });
+
             setMethodePaiement(methodeSelectionnee!);
-            setReservationId(12345);
-            setPaiementId(67890);
+            setReservationId(reservation.id_reservation);
+            setPaiementId(paiement.id);
+            setConfirmationPaiement(confirmation);
             router.push("/reservation/confirmation" as any);
-        }, 2500);
+        } catch (error: any) {
+            const message =
+                error?.response?.data?.message ??
+                "Impossible de finaliser la reservation pour le moment.";
+            Alert.alert("Paiement impossible", message);
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (

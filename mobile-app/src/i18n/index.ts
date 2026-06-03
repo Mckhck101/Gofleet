@@ -30,7 +30,6 @@ i18n
         lng: defaultLanguage,
         fallbackLng: "fr",
         interpolation: { escapeValue: false },
-        compatibilityJSON: "v3",
     });
 
 export default i18n;

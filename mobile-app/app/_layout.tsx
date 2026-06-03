@@ -1,4 +1,3 @@
-import "@/api/mock"
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -6,7 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useAuthStore } from "@/store/authStore";
+import config from "@/constants/config";
 import "@/i18n";
+
+declare const require: any;
+
+if (config.USE_MOCKS) {
+    require("@/api/mock");
+}
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -37,14 +43,10 @@ export default function RootLayout() {
                         <Stack.Screen name="(auth)" />
                         <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="agences/[id]" />   
-                        <Stack.Screen name="ticket/[id]" />
-                        <Stack.Screen name="voyages/[id]" />
-                        <Stack.Screen name="voyages/resultats" />
                         <Stack.Screen name="reservation/sieges" />
                         <Stack.Screen name="reservation/infos" />
                         <Stack.Screen name="reservation/paiement" />
                         <Stack.Screen name="reservation/confirmation" />
-                        <Stack.Screen name="reservations/[id]" />
                         <Stack.Screen name="bienvenue" />
 
                     </Stack>

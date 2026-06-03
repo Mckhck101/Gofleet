@@ -10,6 +10,15 @@ import {
 } from "@/types/auth";
 import { AxiosError } from "axios";
 
+function logAuthError(prefix: string, error: AxiosError) {
+    console.error(prefix, {
+        message: error.message,
+        status: error.response?.status,
+        url: error.config?.url,
+        backend: (error.response?.data as any)?.message,
+    });
+}
+
 export function useConnexion() {
     const { setAuth } = useAuthStore();
     const router = useRouter();
@@ -24,9 +33,7 @@ export function useConnexion() {
             );
             router.replace("/bienvenue");
         },
-        onError: (error: AxiosError) => {
-            console.error("Erreur connexion :", error.message);
-        },
+        onError: (error: AxiosError) => logAuthError("Erreur connexion", error),
     });
 }
 
@@ -44,9 +51,7 @@ export function useInscription() {
             );
             router.replace("/bienvenue");
         },
-        onError: (error: AxiosError) => {
-            console.error("Erreur inscription :", error.message);
-        },
+        onError: (error: AxiosError) => logAuthError("Erreur inscription", error),
     });
 }
 

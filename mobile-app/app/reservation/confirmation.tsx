@@ -31,6 +31,7 @@ import {
     Copy,
 } from "phosphor-react-native";
 import colors from "@/constants/colors";
+import { useReservationStore } from "@/store/reservationStore";
 
 const { width: W } = Dimensions.get("window");
 
@@ -42,8 +43,8 @@ interface TicketResponse {
     codeTicket: string;
     qrCodeBase64: string | null;
     qrCodeUrl: string | null;
-    dateGeneration: string;
-    dateExpiration: string;
+    dateGeneration: string | null;
+    dateExpiration: string | null;
     statut: StatutTicket;
     reservationId: number;
 }
@@ -51,9 +52,9 @@ interface TicketResponse {
 interface FactureResponse {
     id: number;
     numeroFacture: string;
-    dateGeneration: string;
+    dateGeneration: string | null;
     montant: number;
-    pdfUrl: string;
+    pdfUrl: string | null;
 }
 
 interface ConfirmationData {
@@ -273,10 +274,32 @@ const qrStyles = StyleSheet.create({
 export default function ConfirmationScreen() {
     const { t } = useTranslation();
     const router = useRouter();
+    const { confirmationPaiement, voyageSelectionne, siegeSelectionne, infosVoyageur } =
+        useReservationStore();
 
-    // TODO: récupérer depuis reservationStore ou route params
-    // les données viennent de la réponse de POST /paiements/confirmer
-    const data = MOCK_CONFIRMATION;
+    const reservation = confirmationPaiement?.reservation;
+    const voyage = reservation?.voyage ?? voyageSelectionne;
+    const siege = reservation?.siege ?? siegeSelectionne;
+    const data: ConfirmationData = reservation && voyage && siege
+        ? {
+              reservationId: reservation.id,
+              agenceNom: voyage.agence?.nom ?? "Agence",
+              agenceCouleur: colors.primary,
+              villeDepart: voyage.villeDepart,
+              gareDepart: voyage.gareDepart,
+              villeArrivee: voyage.villeArrivee,
+              gareArrivee: voyage.gareArrivee,
+              dateDepart: voyage.dateDepart,
+              heureDepart: voyage.heureDepart,
+              numeroSiege: siege.numeroSiege,
+              typeClasse: voyage.typeClasse,
+              montant: reservation.montant,
+              devise: voyage.devise,
+              nomVoyageur: reservation.nomComplet ?? infosVoyageur?.nomComplet ?? "",
+              ticket: reservation.ticket ?? MOCK_CONFIRMATION.ticket,
+              facture: reservation.facture ?? MOCK_CONFIRMATION.facture,
+          }
+        : MOCK_CONFIRMATION;
     const c = data.agenceCouleur;
 
     // ── Animations d'entrée ────────────────────────────────────
@@ -391,7 +414,7 @@ export default function ConfirmationScreen() {
 
                     <View style={s.ticketMeta}>
                         <Text style={s.ticketMetaText}>
-                            {t("ticket.date_expiration")} : {formatDateTime(data.ticket.dateExpiration)}
+                            {t("ticket.date_expiration")} : {data.ticket.dateExpiration ? formatDateTime(data.ticket.dateExpiration) : "Non definie"}
                         </Text>
                     </View>
 

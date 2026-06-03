@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { VoyageDetailResponse, SiegeResponse } from "@/types/voyage";
-import { CreerReservationRequest } from "@/types/reservation";
-import { MethodePaiement } from "@/types/paiement";
+import { CreerReservationRequest, ReservationDetailResponse } from "@/types/reservation";
+import { MethodePaiement, PaiementResponse } from "@/types/paiement";
+
+export interface ConfirmationPaiementState {
+    paiement: PaiementResponse;
+    reservation: ReservationDetailResponse;
+    message: string;
+}
 
 interface ReservationState {
     // ─── Étapes du tunnel de réservation ─────────
@@ -11,6 +17,7 @@ interface ReservationState {
     methodePaiement: MethodePaiement | null;
     reservationId: number | null;
     paiementId: number | null;
+    confirmationPaiement: ConfirmationPaiementState | null;
 
     // ─── Actions ──────────────────────────────────
     setVoyage: (voyage: VoyageDetailResponse) => void;
@@ -19,6 +26,7 @@ interface ReservationState {
     setMethodePaiement: (methode: MethodePaiement) => void;
     setReservationId: (id: number) => void;
     setPaiementId: (id: number) => void;
+    setConfirmationPaiement: (confirmation: ConfirmationPaiementState) => void;
     reset: () => void;
 }
 
@@ -29,6 +37,7 @@ const initialState = {
     methodePaiement: null,
     reservationId: null,
     paiementId: null,
+    confirmationPaiement: null,
 };
 
 export const useReservationStore = create<ReservationState>((set) => ({
@@ -40,5 +49,7 @@ export const useReservationStore = create<ReservationState>((set) => ({
     setMethodePaiement: (methode) => set({ methodePaiement: methode }),
     setReservationId: (id) => set({ reservationId: id }),
     setPaiementId: (id) => set({ paiementId: id }),
+    setConfirmationPaiement: (confirmation) =>
+        set({ confirmationPaiement: confirmation }),
     reset: () => set(initialState),
 }));

@@ -1,6 +1,7 @@
 import apiClient from "./client";
 import {
     CreerReservationRequest,
+    ReservationCreationResponse,
     ReservationDetailResponse,
     PageReservation,
     StatutReservation,
@@ -23,8 +24,8 @@ export const reservationsApi = {
 
     creer: async (
         data: CreerReservationRequest
-    ): Promise<ReservationDetailResponse> => {
-        const response = await apiClient.post<ReservationDetailResponse>(
+    ): Promise<ReservationCreationResponse> => {
+        const response = await apiClient.post<ReservationCreationResponse>(
             "/reservations",
             data
         );
@@ -39,9 +40,7 @@ export const reservationsApi = {
     },
 
     annuler: async (id: number): Promise<ApiSuccess> => {
-        const response = await apiClient.post<ApiSuccess>(
-            `/reservations/${id}/annuler`
-        );
+        const response = await apiClient.delete<ApiSuccess>(`/reservations/${id}`);
         return response.data;
     },
 
@@ -61,14 +60,14 @@ export const reservationsApi = {
 
     getTicket: async (id: number): Promise<TicketResponse> => {
         const response = await apiClient.get<TicketResponse>(
-            `/reservations/${id}/ticket`
+            `/tickets/reservation/${id}`
         );
         return response.data;
     },
 
     getFacture: async (id: number): Promise<FactureResponse> => {
         const response = await apiClient.get<FactureResponse>(
-            `/reservations/${id}/facture`
+            `/factures/reservation/${id}`
         );
         return response.data;
     },

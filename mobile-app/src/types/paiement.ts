@@ -13,7 +13,10 @@ export interface InitierPaiementRequest {
 }
 
 export interface InitierPaiementResponse {
-    paiementId: number;
+    id: number;
+    reservationId: number;
+    montant: number;
+    methode: MethodePaiement;
     referenceTransaction: string;
     urlPaiement: string | null;
     instructionsPaiement: string | null;

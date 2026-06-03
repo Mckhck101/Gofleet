@@ -245,7 +245,9 @@ const EditModal = ({ visible, title, fields, onSave, onClose }: EditModalProps) 
                                 <View key={f.key} style={modalStyles.fieldWrap}>
                                     <Text style={modalStyles.fieldLabel}>{f.label}</Text>
                                     <TextInput
-                                        ref={(r) => (inputRefs.current[f.key] = r)}
+                                        ref={(r) => {
+                                            inputRefs.current[f.key] = r;
+                                        }}
                                         style={[
                                             modalStyles.input,
                                             f.multiline && { height: 80, textAlignVertical: "top" },

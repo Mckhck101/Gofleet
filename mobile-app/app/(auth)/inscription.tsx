@@ -19,6 +19,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PasswordMascot from "@/components/ui/PasswordMascot";
 import { useInscription } from "@/hooks/useAuth";
+import config from "@/constants/config";
 import colors from "@/constants/colors";
 
 type MascotColor = "blue" | "red" | "orange" | "green";
@@ -70,6 +71,15 @@ export default function InscriptionScreen() {
         numeroCni: "",
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const isNetworkError =
+        (error as any)?.message === "Network Error" ||
+        ((error as any)?.request && !(error as any)?.response);
+    const apiErrorMessage =
+        isNetworkError
+            ? `Impossible de joindre le backend: ${config.BASE_URL}`
+            : (error as any)?.response?.data?.message ??
+              (error as any)?.message ??
+              "Erreur lors de l'inscription";
 
     // ─── Date picker ─────────────────────────────
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -595,7 +605,7 @@ export default function InscriptionScreen() {
                     {error && (
                         <View style={styles.apiError}>
                             <Text style={styles.apiErrorText}>
-                                {t("auth.email_deja_utilise")}
+                                {apiErrorMessage}
                             </Text>
                         </View>
                     )}
@@ -617,7 +627,7 @@ export default function InscriptionScreen() {
                                 label="Suivant →"
                                 onPress={handleSuivant}
                                 size="lg"
-                                style={[styles.btnSuivant, etape === 0 && styles.btnSuivantFull]}
+                                style={etape === 0 ? styles.btnSuivantFull : styles.btnSuivant}
                             />
                         ) : (
                             <Button

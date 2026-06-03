@@ -521,7 +521,7 @@ export default function ReservationsScreen() {
                         </Text>
                         {agencesFiltrees.length === 0 ? (
                             <EmptyState
-                                icon="buildings"
+                                icon="business"
                                 title={t(
                                     "reservation.aucune_agence"
                                 )}
@@ -594,7 +594,7 @@ export default function ReservationsScreen() {
                         </Text>
                         {agencesFiltrees.length === 0 ? (
                             <EmptyState
-                                icon="buildings"
+                                icon="business"
                                 title={t(
                                     "reservation.aucune_agence"
                                 )}

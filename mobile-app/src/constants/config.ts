@@ -1,6 +1,35 @@
+import Constants from "expo-constants";
+
+function getHostFromUri(uri?: string | null): string {
+    if (!uri) return "";
+    return uri.replace(/^https?:\/\//, "").split(":")[0];
+}
+
+function getApiBaseUrl(): string {
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+
+    const constants = Constants as any;
+    const hostUri =
+        Constants.expoConfig?.hostUri ??
+        Constants.manifest2?.extra?.expoClient?.hostUri ??
+        constants.manifest?.debuggerHost ??
+        constants.manifest?.hostUri ??
+        "";
+    const host = getHostFromUri(hostUri);
+
+    if (host) {
+        return `http://${host}:8080/api/v1`;
+    }
+
+    return "http://localhost:8080/api/v1";
+}
+
 const config = {
     // Change cette URL quand le backend de ton camarade sera prêt
-    BASE_URL: "http://localhost:8080/api/v1",
+    BASE_URL: getApiBaseUrl(),
+    USE_MOCKS: process.env.EXPO_PUBLIC_USE_MOCKS === "true",
 
     // Durée avant expiration du token (en ms) — 1 heure
     TOKEN_EXPIRY: 3600 * 1000,

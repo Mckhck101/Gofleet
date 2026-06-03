@@ -6,7 +6,6 @@ import {
     PaiementResponse,
 } from "@/types/paiement";
 import { ReservationDetailResponse } from "@/types/reservation";
-import { TicketResponse } from "@/types/ticket";
 
 export const paiementsApi = {
     initier: async (
@@ -27,13 +26,6 @@ export const paiementsApi = {
         message: string;
     }> => {
         const response = await apiClient.post("/paiements/confirmer", data);
-        return response.data;
-    },
-
-    getStatut: async (id: number): Promise<PaiementResponse> => {
-        const response = await apiClient.get<PaiementResponse>(
-            `/paiements/${id}/statut`
-        );
         return response.data;
     },
 };

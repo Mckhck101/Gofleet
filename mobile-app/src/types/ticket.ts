@@ -3,10 +3,10 @@ export type StatutTicket = "VALIDE" | "UTILISE" | "ANNULE";
 export interface TicketResponse {
     id: number;
     codeTicket: string;
-    qrCodeBase64: string;
-    qrCodeUrl: string;
-    dateGeneration: string;
-    dateExpiration: string;
+    qrCodeBase64: string | null;
+    qrCodeUrl: string | null;
+    dateGeneration: string | null;
+    dateExpiration: string | null;
     statut: StatutTicket;
     reservationId: number;
 }
@@ -14,9 +14,9 @@ export interface TicketResponse {
 export interface FactureResponse {
     id: number;
     numeroFacture: string;
-    dateGeneration: string;
+    dateGeneration: string | null;
     montant: number;
-    pdfUrl: string;
+    pdfUrl: string | null;
 }
 
 export interface ValidationTicketResponse {

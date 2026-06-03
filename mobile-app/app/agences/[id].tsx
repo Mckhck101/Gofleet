@@ -437,7 +437,7 @@ export default function AgenceDetailScreen() {
         return (
             <View style={styles.loaderContainer}>
                 <EmptyState
-                    icon="buildings"
+                    icon="business"
                     title="Agence introuvable"
                     description="Cette agence n'existe pas"
                     actionLabel="Retour"

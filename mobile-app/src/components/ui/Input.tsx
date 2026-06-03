@@ -20,6 +20,7 @@ import {
     MagnifyingGlass,
     MapPin,
     Warning,
+    Buildings,
 } from "phosphor-react-native";
 import colors from "@/constants/colors";
 
@@ -35,7 +36,8 @@ type IconName =
     | "eye-slash"
     | "search"
     | "map-pin"
-    | "warning";
+    | "warning"
+    | "buildings";
 
 function RenderIcon({
     name,
@@ -69,6 +71,8 @@ function RenderIcon({
             return <MapPin size={size} color={color} />;
         case "warning":
             return <Warning size={size} color={color} />;
+        case "buildings":
+            return <Buildings size={size} color={color} />;
         default:
             return null;
     }
